@@ -11,11 +11,17 @@ public class book {
         this.isIssued = false;
     }
 
-    public void displayBook() {
+    void displayBook() {
         System.out.println("Book ID: " + bookId);
         System.out.println("Title: " + title);
         System.out.println("Author: " + author);
-        System.out.println("Issued: " + isIssued);
-        System.out.println("----------------------");
+
+        if (isIssued) {
+            System.out.println("Status: Issued");
+      } else {
+            System.out.println("Status: Available");
+        }
+
+            System.out.println("----------------------");
+        }
     }
-}
