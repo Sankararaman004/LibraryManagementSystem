@@ -1,5 +1,4 @@
 
-import java.util.ArrayList;
 import java.util.Scanner;
 
 public class librarymanagement {
@@ -7,8 +6,6 @@ public class librarymanagement {
     public static void main(String[] args) {
 
         Scanner sc = new Scanner(System.in);
-        ArrayList<book> books = new ArrayList<>();
-
         int choice;
 
         do {
@@ -34,68 +31,97 @@ public class librarymanagement {
 
             switch (choice) {
 
-                case 1:
-                    System.out.print("Enter Book ID: ");
+                
+            case 1:
+                System.out.print("Enter Book ID: ");
 
-                    String bookidinput = sc.nextLine();
-                    int id;
+                String bookidinput = sc.nextLine();
+                int id;
 
-                    try {
-                        id = Integer.parseInt(bookidinput);
-                  } catch (NumberFormatException e) {
-                        System.out.println("Invalid Book ID! Please enter a number.");
-                        break;
-                  }
+                try {
+                id = Integer.parseInt(bookidinput);
+             }  catch (NumberFormatException e) {
+                    System.out.println("Invalid Book ID! Please enter a number.");
+                    break;
+             }
 
-                    boolean idExists = false;
+                System.out.print("Enter Book Title: ");
+                String title = sc.nextLine();
 
-                    for (book b : books) {
-                        if (b.bookId == id) {
-                            idExists = true;
-                            break;
-                        }
-                    }
+                System.out.print("Enter Author Name: ");
+                String author = sc.nextLine();
 
-                    if (idExists) {
-                        System.out.println("Book ID already exists!");
-                        break;
-                    }
+                String sql = "INSERT INTO books (book_id, title, author, is_issued) VALUES (?, ?, ?, FALSE)";
 
-                    System.out.print("Enter Book Title: ");
-                    String title = sc.nextLine();
+                try (
+                    java.sql.Connection con = DBConnection.getConnection();
+                    java.sql.PreparedStatement ps = con.prepareStatement(sql)
+                ) {
+                    ps.setInt(1, id);
+                    ps.setString(2, title);
+                    ps.setString(3, author);
 
-                    System.out.print("Enter Author Name: ");
-                    String author = sc.nextLine();
+                    ps.executeUpdate();
 
-                    book newBook = new book(id, title, author);
-                    books.add(newBook);
+                    System.out.println("Book added successfully to MySQL!");
 
-                    System.out.println("Book added successfully!");
+               }catch (java.sql.SQLIntegrityConstraintViolationException e) {
+                    System.out.println("Book ID already exists!");
+
+              } catch (java.sql.SQLException e) {
+                    System.out.println("Unable to add book to MySQL.");
+                    e.printStackTrace();
+              }
+
                     break;
 
-               case 2:
-                    viewBooks(books);
+
+                case 2:
+                    viewBooks();
                     break;
 
+               
                 case 3:
                     System.out.print("Enter Book ID to search: ");
-                    int searchId = sc.nextInt();
 
-                    boolean found = false;
+                    String searchInput = sc.nextLine();
+                    int searchId;
 
-                    for (book b : books) {
-                        if (b.bookId == searchId) {
-                            b.displayBook();
-                            found = true;
-                            break;
-                        }
+                    try {
+                        searchId = Integer.parseInt(searchInput);
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid Book ID! Please enter a number.");
+                        break;
                     }
 
-                    if (!found) {
+                    String searchSql = "SELECT book_id, title, author, is_issued FROM books WHERE book_id = ?";
+                    try (
+                        java.sql.Connection con = DBConnection.getConnection();
+                        java.sql.PreparedStatement ps = con.prepareStatement(searchSql)
+                    ) {
+                    ps.setInt(1, searchId);
+
+                    try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        System.out.println("Book ID: " + rs.getInt("book_id"));
+                        System.out.println("Title: " + rs.getString("title"));
+                        System.out.println("Author: " + rs.getString("author"));
+                        System.out.println("Status: " +
+                        (rs.getBoolean("is_issued") ? "Issued" : "Available"));
+                  } else {
                         System.out.println("Book not found!");
-                    }
+                }
+            }
+
+                  } catch (java.sql.SQLException e) {
+                        System.out.println("Unable to search for the book.");
+                        e.printStackTrace();
+                 }
+
                     break;
 
+
+                
                 case 4:
                     System.out.print("Enter Book ID to issue: ");
 
@@ -103,72 +129,102 @@ public class librarymanagement {
                     int issueId;
 
                     try {
-                    issueId = Integer.parseInt(issueInput);
+                        issueId = Integer.parseInt(issueInput);
                   } catch (NumberFormatException e) {
-                    System.out.println("Invalid Book ID! Please enter a number.");
-                    break;
-                }
+                        System.out.println("Invalid Book ID! Please enter a number.");
+                        break;
+                 }
 
-                    boolean issueFound = false;
+                    String issueSql = "UPDATE books SET is_issued = TRUE WHERE book_id = ? AND is_issued = FALSE";
 
-                    for (book b : books) {
-                    if (b.bookId == issueId) {
-                    issueFound = true;
+                    try (
+                        java.sql.Connection con = DBConnection.getConnection();
+                        java.sql.PreparedStatement ps = con.prepareStatement(issueSql)
+                 ) {
+                        ps.setInt(1, issueId);
 
-                    if (!b.isIssued) {
-                    b.isIssued = true;
-                    System.out.println("Book issued successfully!");
-                  } else {
-                    System.out.println("Book is already issued.");
-                }
+                        int rowsUpdated = ps.executeUpdate();
 
-                    break;
-                }
-            }
+                        if (rowsUpdated > 0) {
+                            System.out.println("Book issued successfully!");
+                      } else {
+                            String checkSql = "SELECT is_issued FROM books WHERE book_id = ?";
 
-                    if (!issueFound) {
-                    System.out.println("Book not found!");
-               }
-                    break;
+                            try (java.sql.PreparedStatement checkPs = con.prepareStatement(checkSql)) {
+                            checkPs.setInt(1, issueId);
 
-                case 5:
+                            try (java.sql.ResultSet rs = checkPs.executeQuery()) {
+                                if (rs.next()) {
+                                    System.out.println("Book is already issued.");
+                              } else {
+                                    System.out.println("Book not found!");
+                            }
+                        }
+                    }
+                 }
+
+                          } catch (java.sql.SQLException e) {
+                                System.out.println("Unable to issue the book.");
+                                e.printStackTrace();
+                          }
+
+                            break;
+
+
+                
+                 case 5:
                     System.out.print("Enter Book ID to return: ");
 
                     String returnInput = sc.nextLine();
                     int returnId;
 
                     try {
-                    returnId = Integer.parseInt(returnInput);
+                        returnId = Integer.parseInt(returnInput);
                   } catch (NumberFormatException e) {
-                    System.out.println("Invalid Book ID! Please enter a number.");
+                        System.out.println("Invalid Book ID! Please enter a number.");
                     break;
-                }
+                  }
 
-                    boolean returnFound = false;
+                    String returnSql = "UPDATE books SET is_issued = FALSE WHERE book_id = ? AND is_issued = TRUE";
 
-                    for (book b : books) {
-                        if (b.bookId == returnId) {
-                        returnFound = true;
+                    try (
+                        java.sql.Connection con = DBConnection.getConnection();
+                        java.sql.PreparedStatement ps = con.prepareStatement(returnSql)
+                    ) {
+                        ps.setInt(1, returnId);
 
-                        if (b.isIssued) {
-                            b.isIssued = false;
-                            System.out.println("Book returned successfully!");
-                      } else {
+                        int rowsUpdated = ps.executeUpdate();
+
+                    if (rowsUpdated > 0) {
+                        System.out.println("Book returned successfully!");
+                  } else {
+                        String checkSql = "SELECT is_issued FROM books WHERE book_id = ?";
+
+                    try (java.sql.PreparedStatement checkPs = con.prepareStatement(checkSql)) {
+                            checkPs.setInt(1, returnId);
+
+                   try (java.sql.ResultSet rs = checkPs.executeQuery()) {
+                        if (rs.next()) {
                             System.out.println("This book was not issued.");
+                      } else {
+                            System.out.println("Book not found!");
+                      }
                     }
+                } 
+            }
 
-                        break;
-                    }
-                }
+                  } catch (java.sql.SQLException e) {
+                        System.out.println("Unable to return the book.");
+                        e.printStackTrace();
+                 }
 
-                        if (!returnFound) {
-                        System.out.println("Book not found!");
-                    }
-                        break;
+                    break;
+
                 case 6:
                     System.out.println("Thank you for using the Library Management System!");
                     break;
 
+                
                 case 7:
                     System.out.println("Search by:");
                     System.out.println("1. Book Title");
@@ -177,27 +233,50 @@ public class librarymanagement {
 
                     String searchChoice = sc.nextLine();
 
+                    if (!searchChoice.equals("1") && !searchChoice.equals("2")) {
+                        System.out.println("Invalid search choice!");
+                    break;
+                    }
+
                     System.out.print("Enter title or author name: ");
                     String searchText = sc.nextLine();
 
-                    boolean bookFound = false;
+                    String column = searchChoice.equals("1") ? "title" : "author";
+                    String titleAuthorSql ="SELECT book_id, title, author, is_issued FROM books WHERE " 
+        + column + " LIKE ?";
 
-                    for (book b : books) {
-                        if (searchChoice.equals("1")
-                            && b.title.equalsIgnoreCase(searchText)) {
-                            b.displayBook();
-                            bookFound = true;
-                     } else if (searchChoice.equals("2")
-                            && b.author.equalsIgnoreCase(searchText)) {
-                            b.displayBook();
-                            bookFound = true;
-                     }
-                   }
+                    try (
+                        java.sql.Connection con = DBConnection.getConnection();
+                        java.sql.PreparedStatement ps = con.prepareStatement(titleAuthorSql)
+                    ) {
+                        ps.setString(1, "%" + searchText + "%");
 
-                       if (!bookFound) {
-                       System.out.println("Book not found.");
+                    try (java.sql.ResultSet rs = ps.executeQuery()) {
+                        boolean bookFound = false;
+
+                    while (rs.next()) {
+                        System.out.println("Book ID: " + rs.getInt("book_id"));
+                        System.out.println("Title: " + rs.getString("title"));
+                        System.out.println("Author: " + rs.getString("author"));
+                        System.out.println("Status: " +
+                        (rs.getBoolean("is_issued") ? "Issued" : "Available"));
+                        System.out.println("----------------------");
+
+                        bookFound = true;
+                    }
+
+                    if (!bookFound) {
+                        System.out.println("Book not found.");
+                    }
+                }
+
+                  } catch (java.sql.SQLException e) {
+                        System.out.println("Unable to search books.");
+                        e.printStackTrace();
                   }
-                       break;
+
+                    break;
+
 
                 default:
                     System.out.println("Invalid choice! Please try again.");
@@ -208,17 +287,28 @@ public class librarymanagement {
         sc.close();
     }
 
-    static void viewBooks(ArrayList<book> books) {
-    if (books.isEmpty()) {
-        System.out.println("No books available.");
-        return;
-    }
+    
+public static void viewBooks() {
+    String sql = "SELECT book_id, title, author, is_issued FROM books";
 
-    System.out.println("\n===== BOOK DETAILS =====");
-
-    for (book b : books) {
-        b.displayBook();
+    try (
+        java.sql.Connection con = DBConnection.getConnection();
+        java.sql.Statement stmt = con.createStatement();
+        java.sql.ResultSet rs = stmt.executeQuery(sql)
+    ) {
+        while (rs.next()) {
+            System.out.println("Book ID: " + rs.getInt("book_id"));
+            System.out.println("Title: " + rs.getString("title"));
+            System.out.println("Author: " + rs.getString("author"));
+            System.out.println("Status: " +
+                (rs.getBoolean("is_issued") ? "Issued" : "Available"));
+            System.out.println("----------------------");
+        }
+    } catch (java.sql.SQLException e) {
+        System.out.println("Unable to retrieve books from MySQL.");
+        e.printStackTrace();
     }
 }
+
 }
 
