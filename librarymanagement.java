@@ -1,4 +1,8 @@
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Scanner;
 
 public class librarymanagement {
@@ -17,6 +21,7 @@ public class librarymanagement {
             System.out.println("5. Return Book");
             System.out.println("6. Exit");
             System.out.println("7. Search Book by Title");
+            System.out.println("8. View Overdue Books");
             System.out.print("Enter your choice: ");
 
             String input = sc.nextLine();
@@ -135,8 +140,7 @@ public class librarymanagement {
                         break;
                  }
 
-                    String issueSql = "UPDATE books SET is_issued = TRUE WHERE book_id = ? AND is_issued = FALSE";
-
+                    String issueSql ="UPDATE books SET is_issued = TRUE, issue_date = CURDATE(), due_date = DATE_ADD(CURDATE(), INTERVAL 14 DAY), return_date = NULL WHERE book_id = ? AND is_issued = FALSE";
                     try (
                         java.sql.Connection con = DBConnection.getConnection();
                         java.sql.PreparedStatement ps = con.prepareStatement(issueSql)
@@ -185,7 +189,7 @@ public class librarymanagement {
                     break;
                   }
 
-                    String returnSql = "UPDATE books SET is_issued = FALSE WHERE book_id = ? AND is_issued = TRUE";
+                    String returnSql ="UPDATE books SET is_issued = FALSE, return_date = CURDATE() WHERE book_id = ? AND is_issued = TRUE";
 
                     try (
                         java.sql.Connection con = DBConnection.getConnection();
@@ -277,6 +281,10 @@ public class librarymanagement {
 
                     break;
 
+                case 8:
+                    viewOverdueBooks();
+                    break;
+
 
                 default:
                     System.out.println("Invalid choice! Please try again.");
@@ -306,6 +314,41 @@ public static void viewBooks() {
         }
     } catch (java.sql.SQLException e) {
         System.out.println("Unable to retrieve books from MySQL.");
+        e.printStackTrace();
+    } 
+}
+public static void viewOverdueBooks() {
+    String sql = "SELECT book_id, title, author, issue_date, due_date, " +
+                 "DATEDIFF(CURDATE(), due_date) AS days_overdue " +
+                 "FROM books " +
+                 "WHERE is_issued = TRUE AND due_date < CURDATE()";
+
+    try (Connection con = DBConnection.getConnection();
+         PreparedStatement ps = con.prepareStatement(sql);
+         ResultSet rs = ps.executeQuery()) {
+
+        boolean found = false;
+
+        System.out.println("\n===== OVERDUE BOOKS =====");
+
+        while (rs.next()) {
+            found = true;
+
+            System.out.println("Book ID: " + rs.getInt("book_id"));
+            System.out.println("Title: " + rs.getString("title"));
+            System.out.println("Author: " + rs.getString("author"));
+            System.out.println("Issue Date: " + rs.getDate("issue_date"));
+            System.out.println("Due Date: " + rs.getDate("due_date"));
+            System.out.println("Days Overdue: " + rs.getInt("days_overdue"));
+            System.out.println("-------------------------");
+        }
+
+        if (!found) {
+            System.out.println("No overdue books found.");
+        }
+
+    } catch (SQLException e) {
+        System.out.println("Unable to retrieve overdue books.");
         e.printStackTrace();
     }
 }
